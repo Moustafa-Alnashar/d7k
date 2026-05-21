@@ -25,23 +25,6 @@ def extract_zcr_ste(filepath, target_sr=8000, frame_size=128, hop_size=128):
     # 8-bit WAV files are unsigned PCM. librosa.load automatically scales it to [-1.0, 1.0]
     y, sr = librosa.load(filepath, sr=target_sr, mono=True)
     
-    # Critical Fix: Do not use librosa.effects.trim(). 
-    y_trimmed, _ = librosa.effects.trim(y, top_db=15)
-
-    target_len = int(target_sr * 1.0)
-
-    if len(y_trimmed) < target_len:
-        pad_total = target_len - len(y_trimmed)
-        pad_left = pad_total // 2
-        pad_right = pad_total - pad_left
-        y_fixed = np.pad(y_trimmed, (pad_left, pad_right))
-    else:
-        cut_total = len(y_trimmed) - target_len
-        cut_left = cut_total // 2
-        cut_right = cut_total - cut_left
-        y_fixed = y_trimmed[cut_left : len(y_trimmed) - cut_right]
-    # Trimming removes silence from the start/end, which destroys alignment with the raw MCU data.
-    
     # Enforce exact temporal length to match N_FEATURES * FRAME_SIZE
     if len(y) < TOTAL_SAMPLES:
         y_fixed = np.pad(y, (0, TOTAL_SAMPLES - len(y)))
