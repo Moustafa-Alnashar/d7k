@@ -28,6 +28,7 @@
       <itemPath>DUMP.c</itemPath>
       <itemPath>newmain2.c</itemPath>
       <itemPath>newmain3.c</itemPath>
+      <itemPath>bedo.c</itemPath>
     </logicalFolder>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
@@ -173,6 +174,10 @@
         <property key="sram-segment" value=""/>
         <property key="v-printf" value="true"/>
       </AVR-LD>
+      <item path="DUMP.c" ex="true" overriding="false">
+      </item>
+      <item path="bedo.c" ex="true" overriding="false">
+      </item>
       <item path="newmain1.c" ex="false" overriding="false">
         <AVR-AR>
         </AVR-AR>

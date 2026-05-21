@@ -3,6 +3,7 @@ import numpy as np
 import librosa
 from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
+import wave
 
 ROOT = "."
 
@@ -13,9 +14,9 @@ if not os.path.exists(SAMPLE_PATH):
 EXPORT_PATH = f"{ROOT}/exported_templates/"
 os.makedirs(EXPORT_PATH, exist_ok=True)
 
-TEMPLATES_PER_WORD = 2
+TEMPLATES_PER_WORD = 4
 W_ZCR = 0.6
-W_STE = 0.4
+W_STE = 1.0 - W_ZCR
 
 # Dynamically generate the WORDS list from folder names
 WORDS = sorted([
@@ -27,44 +28,30 @@ print(f"Detected {len(WORDS)} words dynamically: {WORDS}")
 
 def extract_zcr_ste(filepath, target_sr=8000, duration=1.0, frame_size=128, hop_size=128):
     y, sr = librosa.load(filepath, sr=target_sr, mono=True)
-    y_trimmed, _ = librosa.effects.trim(y, top_db=15)
 
-    target_len = int(target_sr * duration)
+    N_FEATURES = 99
+    TOTAL_SAMPLES = frame_size * N_FEATURES  # 99 frames of 128 samples each = 12,672 samples (~1.58 seconds)
 
-    if len(y_trimmed) < target_len:
-        pad_total = target_len - len(y_trimmed)
-        pad_left = pad_total // 2
-        pad_right = pad_total - pad_left
-        y_fixed = np.pad(y_trimmed, (pad_left, pad_right))
+    if len(y) < TOTAL_SAMPLES:
+        print(f"Warning: '{os.path.basename(filepath)}' is shorter than {duration} seconds. Padding with zeros.")
+        y_fixed = np.pad(y, (0, TOTAL_SAMPLES - len(y)))
     else:
-        cut_total = len(y_trimmed) - target_len
-        cut_left = cut_total // 2
-        cut_right = cut_total - cut_left
-        y_fixed = y_trimmed[cut_left : len(y_trimmed) - cut_right]
+        y_fixed = y[:TOTAL_SAMPLES]
 
     # Pre-emphasis Filter
     y_fixed = librosa.effects.preemphasis(y_fixed, coef=0.95)
-
+    y_fixed = y_fixed / 1.95  # Normalize to keep energy consistent after pre-emphasis
+    
     frames = librosa.util.frame(y_fixed, frame_length=frame_size, hop_length=hop_size)
 
     zcr = librosa.feature.zero_crossing_rate(y_fixed, frame_length=frame_size, hop_length=hop_size, center=False)[0]
     ste = np.mean(frames**2, axis=0)
 
-    min_len = min(len(zcr), len(ste))
-    zcr = zcr[:min_len]
-    ste = ste[:min_len]
+    zcr = zcr[:N_FEATURES]
+    ste = ste[:N_FEATURES]
 
-    # print(f"Extracted features from '{os.path.basename(filepath)}': ZCR min={zcr.min():.3f}, max={zcr.max():.3f}, mean={zcr.mean():.3f} | STE min={ste.min():.6f}, max={ste.max():.6f}, mean={ste.mean():.6f}")
-    # temp_zcr = zcr.copy()
-    # temp_ste = ste.copy()
-
-    # smooth_window = 5
-    # zcr = np.convolve(zcr, np.ones(smooth_window)/smooth_window, mode='same')
-    # ste = np.convolve(ste, np.ones(smooth_window)/smooth_window, mode='same')
-
-    # print(f"Max differences - ZCR: {np.max(temp_zcr - zcr)}, STE: {np.max(temp_ste - ste)}")
-
-    ste = ste / (frame_size * 128 * 128)
+    # zcr = zcr / np.max(zcr) if np.max(zcr) > 0 else zcr
+    # ste = ste / np.max(ste) if np.max(ste) > 0 else ste
 
     return zcr, ste
 

@@ -76,42 +76,14 @@ int8_t classify_word(float* input_zcr, float* input_ste) {
     return predicted_label;
 }
 
-// --- Audio Capture using Non-blocking Interrupt Pacing ---
-//void capture_audio_features(float* zcr_out, float* ste_out) {
-//    for (uint8_t frame = 0; frame < N_FEATURES; frame++) {
-//        uint32_t energy = 0;
-//        uint8_t zero_crossings = 0;
-//        int8_t last_sample = 0;
-//
-//        for (uint8_t i = 0; i < 128; i++) {
-//            // Wait for the hardware timer to tick
-//            while (!sample_ready);
-//            sample_ready = 0; // Clear flag
-//
-//            uint8_t reading = current_raw_sample;
-//            UART_put_uint8_t(reading);
-//
-//            int8_t sample = reading - true_dc_offset;
-//            energy += (int16_t)sample * sample;
-//
-//            if ((sample > 0 && last_sample <= 0) || (sample < 0 && last_sample >= 0)) {
-//                zero_crossings++;
-//            }
-//            last_sample = sample;
-//        }
-//        
-//        zcr_out[frame] = (float)zero_crossings / 128.0f;
-//        ste_out[frame] = (float)energy / 2097152.0f; 
-//    }
-//}
-
 // v2
 void capture_audio_features(float* zcr_out, float* ste_out) {
+    printf("START_STREAM\n");
+    float last_centered = 0.0f;
+    float last_sample = 0.0f;
     for (uint8_t frame = 0; frame < N_FEATURES; frame++) {
         float energy = 0.0f;
         uint8_t zero_crossings = 0;
-        float last_centered = 0.0f;
-        float last_sample = 0.0f;
 
 
         for (uint8_t i = 0; i < 128; i++) {
@@ -122,9 +94,15 @@ void capture_audio_features(float* zcr_out, float* ste_out) {
             uint8_t reading = current_raw_sample;
             UART_put_uint8_t(reading);
             
-            float centered = ((float)reading - (float)true_dc_offset) / 128.0f;
+            int8_t centered_i8 = (int8_t)((int16_t)reading - true_dc_offset);
+            uint8_t centered_u8 = (uint8_t)centered_i8;
+            float centered = ((float)centered_u8 - 128.0f) / 128.0f;
+
+//            float centered = ((float)reading - (float)true_dc_offset) / 128.0f;
 
             float sample = centered - .95f * last_centered;
+            sample /= 1.95f;
+            
             energy += sample * sample;
 
             if (i > 0) {
@@ -140,7 +118,7 @@ void capture_audio_features(float* zcr_out, float* ste_out) {
         }
         
         zcr_out[frame] = (float)zero_crossings / 128.0f;
-        ste_out[frame] = energy / 128;//2097152.0f; // 128(average) * 128 * 128(normalization)
+        ste_out[frame] = energy / 128.0f;
     }
 }
 
@@ -152,37 +130,6 @@ void calibrate_mic() {
     }
     true_dc_offset = (int8_t)(dc_sum >> 10);
 }
-
-// Helper function to apply a moving average filter mimicking np.convolve(..., mode='same')
-//void convolve_same_moving_average(float* input_output, uint8_t size, uint8_t window_size) {
-//    // Create a temporary array to store results so we don't overwrite values mid-calculation
-//    float temp[size]; 
-//    int8_t half_window = window_size / 2; // For window=5, half_window is 2
-//    float scale = 1.0f / (float)window_size;
-//
-//    for (int16_t i = 0; i < size; i++) {
-//        float sum = 0.0f;
-//
-//        // Slide the window centered at index 'i'
-//        for (int8_t w = -half_window; w <= half_window; w++) {
-//            int16_t idx = i + w;
-//
-//            // Check boundaries: NumPy pads with zeros if out of bounds
-//            if (idx >= 0 && idx < size) {
-//                sum += input_output[idx];
-//            }
-//            // else: sum += 0 (implicit zero padding)
-//        }
-//
-//        // Multiply by 1/window_size (same as dividing by window_size)
-//        temp[i] = sum * scale;
-//    }
-//
-//    // Copy the smoothed results back to the original array
-//    for (uint8_t i = 0; i < size; i++) {
-//        input_output[i] = temp[i];
-//    }
-//}
 
 static FILE uart_str = FDEV_SETUP_STREAM(UART_putChar, UART_getChar, _FDEV_SETUP_RW);
 
@@ -215,15 +162,21 @@ int main(void) {
     while (1) {
 //        if (PINB & (1 << BUTTON_PIN)) continue;
         LCD_Clear(); 
-        sprintf(lcd_buffer, "Talk");
+        sprintf(lcd_buffer, "Talk in");
         LCD_String_xy(0,0, lcd_buffer);
-//        _delay_ms(500);
+        _delay_ms(500);
+        
+        for(int i = 3; i > 0; i--){
+            sprintf(lcd_buffer, "%i", i);
+            LCD_String_xy(0,8, lcd_buffer);
+            _delay_ms(500);
+        }
+        
+        LCD_Clear(); 
+        sprintf(lcd_buffer, "Talk now!");
+        LCD_String_xy(0,0, lcd_buffer);
         
         capture_audio_features(current_zcr, current_ste);
-        
-//        #define SMOOTH_WINDOW 5
-//        convolve_same_moving_average(current_zcr, N_FEATURES, SMOOTH_WINDOW);
-//        convolve_same_moving_average(current_ste, N_FEATURES, SMOOTH_WINDOW);
         
         int8_t word_id = classify_word(current_zcr, current_ste);
         
@@ -245,6 +198,6 @@ int main(void) {
 //                prev_word_id = word_id;
 //            }
         }
-//        _delay_ms(2000);
+        _delay_ms(2000);
     }
 }

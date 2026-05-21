@@ -149,3 +149,135 @@
 //        return 0;
 //}
 //
+
+
+//v1
+// --- Audio Capture using Non-blocking Interrupt Pacing ---
+//void capture_audio_features(float* zcr_out, float* ste_out) {
+//    for (uint8_t frame = 0; frame < N_FEATURES; frame++) {
+//        uint32_t energy = 0;
+//        uint8_t zero_crossings = 0;
+//        int8_t last_sample = 0;
+//
+//        for (uint8_t i = 0; i < 128; i++) {
+//            // Wait for the hardware timer to tick
+//            while (!sample_ready);
+//            sample_ready = 0; // Clear flag
+//
+//            uint8_t reading = current_raw_sample;
+//            UART_put_uint8_t(reading);
+//
+//            int8_t sample = reading - true_dc_offset;
+//            energy += (int16_t)sample * sample;
+//
+//            if ((sample > 0 && last_sample <= 0) || (sample < 0 && last_sample >= 0)) {
+//                zero_crossings++;
+//            }
+//            last_sample = sample;
+//        }
+//        
+//        zcr_out[frame] = (float)zero_crossings / 128.0f;
+//        ste_out[frame] = (float)energy / 2097152.0f; // 128(average) * 128 * 128(normalization)
+//    }
+//}
+
+
+//v3
+//#define SAMPLES_TO_READ 8000
+//#define FRAME_LENGTH 160
+//#define HOP_LENGTH 80
+//
+//void capture_audio_features(float* zcr_out, float* ste_out) {
+//    // Dual Accumulators for 50% overlap
+//    float ste_A = 0.0f, ste_B = 0.0f;
+//    int zcr_A = 0, zcr_B = 0;
+//    
+//    float last_centered = 0.0f;
+//    int last_sign = 0;
+//    
+//    int frame_index_A = 0; // Even frames
+//    int frame_index_B = 1; // Odd frames
+//
+//    // Zero out the arrays
+//    for(int i = 0; i < N_FEATURES; i++) {
+//        zcr_out[i] = 0.0f;
+//        ste_out[i] = 0.0f;
+//    }
+//
+//    for (int i = 0; i < SAMPLES_TO_READ; i++) {
+//        // 1. Wait for hardware Timer/ADC tick
+//        while (!sample_ready);
+//        sample_ready = 0; 
+//        uint8_t reading = current_raw_sample;
+//        
+//        // Echo to PC
+//        UART_put_uint8_t(reading); 
+//        
+//        // 2. Pre-emphasis Normalization (Librosa equivalent)
+//        float centered = ((float)reading - 128.0f) / 128.0f;
+//        float sample = centered - 0.95f * last_centered;
+//        last_centered = centered;
+//
+//        // 3. Math for this exact sample
+//        int current_sign = (sample > 0.0f);
+//        int crossed = 0;
+//        if (i > 0 && current_sign != last_sign) {
+//            crossed = 1;
+//        }
+//        last_sign = current_sign;
+//
+//        float energy = sample * sample;
+//
+//        // 4. Feed Accumulator A (Frames 0, 2, 4...)
+//        int pos_A = i % (FRAME_LENGTH * 2); // Tracks 0 to 319
+//        if (pos_A < FRAME_LENGTH) {
+//            ste_A += energy;
+//            if (pos_A > 0) zcr_A += crossed;
+//            
+//            // If Accumulator A finishes its 160-sample window
+//            if (pos_A == FRAME_LENGTH - 1) {
+//                if (frame_index_A < N_FEATURES) {
+//                    zcr_out[frame_index_A] = (float)zcr_A / (float)FRAME_LENGTH;
+//                    ste_out[frame_index_A] = ste_A / (float)FRAME_LENGTH;
+//                }
+//                frame_index_A += 2;
+//                ste_A = 0.0f; // Reset for the next even frame
+//                zcr_A = 0;
+//            }
+//        }
+//
+//        // 5. Feed Accumulator B (Frames 1, 3, 5...)
+//        // B starts exactly halfway through A's window (80 samples offset)
+//        if (i >= HOP_LENGTH) {
+//            int pos_B = (i - HOP_LENGTH) % (FRAME_LENGTH * 2); 
+//            if (pos_B < FRAME_LENGTH) {
+//                ste_B += energy;
+//                if (pos_B > 0) zcr_B += crossed;
+//                
+//                // If Accumulator B finishes its 160-sample window
+//                if (pos_B == FRAME_LENGTH - 1) {
+//                    if (frame_index_B < N_FEATURES) {
+//                        zcr_out[frame_index_B] = (float)zcr_B / (float)FRAME_LENGTH;
+//                        ste_out[frame_index_B] = ste_B / (float)FRAME_LENGTH;
+//                    }
+//                    frame_index_B += 2;
+//                    ste_B = 0.0f; // Reset for the next odd frame
+//                    zcr_B = 0;
+//                }
+//            }
+//        }
+//    }
+//
+//    // 7. STE Normalization (Divide by max)
+//    float max_ste = 0.0f;
+//    for (int i = 0; i < N_FEATURES; i++) {
+//        if (ste_out[i] > max_ste) {
+//            max_ste = ste_out[i];
+//        }
+//    }
+//    if (max_ste > 0.000001f) {
+//        for (int i = 0; i < N_FEATURES; i++) {
+//            ste_out[i] /= max_ste;
+//        }
+//    }
+//}

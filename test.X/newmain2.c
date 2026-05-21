@@ -3,136 +3,81 @@
 #include <stdio.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
 #include <util/delay.h>
-#include <math.h>
 
 #include "adc.h"
 #include "uart.h"
-#include "lcd.h"
-#include "word_templates.h"
 
-#define LED1 PB1
-#define LED2 PB2
-#define LED3 PB3
-#define LED4 PB4
 #define MIC 0
 
-const float W_ZCR = 0.6f;
-const float W_STE = 0.4f;
+// Total continuous samples to stream per batch sequence (~0.64 seconds)
+#define TOTAL_SAMPLES ((uint16_t)5120)
 
-// Global variable for calibrated DC offset
-int8_t true_dc_offset = 128;
-static const char* words[] = {"ana", "tmsah", "famoh", "kabeer", "Chip", "Mega", "Yes", "Zone"};
-// --- Distance Calculation ---
-int8_t classify_word(float* input_zcr, float* input_ste) {
-    float min_dist = 1000000.0f;
-    int8_t predicted_label = -1;
-    
-    for (uint8_t j = 0; j < N_WORDS; j++) {
-        float dist_zcr = 0;
-        float dist_ste = 0;
-        
-        for (uint8_t f = 0; f < N_FEATURES; f++) {
-            float temp_zcr = pgm_read_float(&(zcr_templates[j][f]));
-            float temp_ste = pgm_read_float(&(ste_templates[j][f]));
-            
-            dist_zcr += fabsf(input_zcr[f] - temp_zcr);
-            dist_ste += fabsf(input_ste[f] - temp_ste);
-        }
-        
-        float total_dist = (W_ZCR * dist_zcr) + (W_STE * dist_ste);
-        
-        if (total_dist < min_dist) {
-            min_dist = total_dist;
-            predicted_label = j;
-        }
-    }
-    return predicted_label;
+volatile uint8_t sample_ready = 0;
+volatile uint8_t current_raw_sample = 0;
+int8_t true_dc_offset = 128; 
+
+void timer1_init_8khz(void) {
+    TCCR1B |= (1 << WGM12); // CTC mode
+    OCR1A = 1381;           // 8 kHz tick rate
+    TIMSK |= (1 << OCIE1A); // Enable interrupt
+    TCCR1B |= (1 << CS10);  // Prescaler = 1
 }
 
-// --- Audio Capture ---
-void capture_audio_features(float* zcr_out, float* ste_out) {
-    for (uint8_t frame = 0; frame < N_FEATURES; frame++) {
-        uint32_t energy = 0;
-        uint8_t zero_crossings = 0;
-        int8_t last_sample = 0;
-        
-        for (uint8_t i = 0; i < 128; i++) {
-            uint8_t reading = ADC_Read_H(MIC);
-            UART_putChar(reading, NULL);
-            
-            int8_t sample = reading - true_dc_offset;
-            
-            energy += sample * sample;
-            
-            if ((sample > 0 && last_sample <= 0) || (sample < 0 && last_sample >= 0)) {
-                zero_crossings++;
-            }
-            last_sample = sample;
-            
-//            _delay_us(60);
-        }
-
-        zcr_out[frame] = (float)zero_crossings / 128.0f;
-        ste_out[frame] = (float)energy / 2097152.0f;
-    }
-}
-
-void calibrate_mic() {
-    uint32_t dc_sum = 0;
-    for(int i = 0; i < 1024; i++) {
-        dc_sum += ADC_Read_H(MIC);
-        _delay_us(83); // Sample at roughly 12kHz
-    }
-    true_dc_offset = (int8_t)(dc_sum >> 10);
+ISR(TIMER1_COMPA_vect) {
+    current_raw_sample = ADC_Read_H(MIC);
+    sample_ready = 1;
 }
 
 static FILE uart_str = FDEV_SETUP_STREAM(UART_putChar, UART_getChar, _FDEV_SETUP_RW);
 
 int main(void) {
-    LCD_Init();
-    LCD_Clear();
-    char lcd_buffer[17];
-
     UART_Init(115200);
     stdin = stdout = &uart_str;
-
     ADC_Init();
-    DDRB |= (1 << LED1) | (1 << LED2) | (1 << LED3) | (1 << LED4);
-
-    // Calibrate the microphone on startup (Keep the room quiet for 0.1 seconds!)
-//    calibrate_mic();
-
-    float current_zcr[N_FEATURES];
-    float current_ste[N_FEATURES];
-
-    int8_t prev_word_id = -1;
+    timer1_init_8khz();
+    sei();
 
     while (1) {
-        // 1. Wait indefinitely until someone actually speaks
+        uint32_t total_zero_crossings = 0;
+        float last_centered = 0.0f;
+        float last_sample = 0.0f;
 
-        // 2. Capture the features (now perfectly aligned to the start of the word!)
-        capture_audio_features(current_zcr, current_ste);
+        // 1. Tell Python the batch has started
+        printf("\n--- START BATCH ---\n");
+        printf("TOTAL_SAMPLES: %u\n", TOTAL_SAMPLES);
 
-        // 3. Classify
-        int8_t word_id = classify_word(current_zcr, current_ste);
-//        printf("word is %s\n", words[word_id]);
+        // 2. Pure Streaming: Zero Arrays, Zero Memory Footprint
+        for (uint16_t i = 0; i < TOTAL_SAMPLES; i++) {
+            // Wait precisely for the 8kHz clock hardware edge
+            while (!sample_ready);
+            sample_ready = 0;
+            
+            uint8_t raw = current_raw_sample;
 
-        // 4. Update LEDs
-        PORTB = ~(word_id << 1);
+            // Compute DSP math on-the-fly
+            float centered = ((float)raw - (float)true_dc_offset) / 128.0f;
+            float sample = centered - 0.95f * last_centered; // Pre-emphasis
+            last_centered = centered;
 
-        // 5. Update LCD
-        if(word_id != prev_word_id){
-            LCD_Clear();
+            if (i > 0) {
+                if ((sample < 0.0f && last_sample >= 0.0f) || (sample > 0.0f && last_sample <= 0.0f)) {
+                    total_zero_crossings++;
+                }
+            }
+            last_sample = sample;
 
-            sprintf(lcd_buffer, "Word is");
-            LCD_String_xy(0,0, lcd_buffer);
-
-            sprintf(lcd_buffer, words[word_id]);
-            LCD_String_xy(1, 0, lcd_buffer);
-
-            prev_word_id = word_id;
+            // Stream the single byte onto the serial wire instantly.
+            // This takes ~86.8us, returning control before the next 125us interrupt!
+            UART_put_uint8_t(raw); 
         }
+
+        // 3. Output trailing pipeline processing metrics
+        float avr_zcr = (float)total_zero_crossings / (float)TOTAL_SAMPLES;
+        printf("\nAVR_CROSSINGS: %lu\n", total_zero_crossings);
+        printf("AVR_ZCR: %.4f\n", avr_zcr);
+        printf("--- END BATCH ---\n");
+
+        _delay_ms(3000); // Peace window for desktop processing loops
     }
 }

@@ -51,17 +51,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=lcd.c newmain1.c uart.c adc.c DUMP.c
+SOURCEFILES_QUOTED_IF_SPACED=lcd.c newmain1.c uart.c adc.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/lcd.o ${OBJECTDIR}/newmain1.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/adc.o ${OBJECTDIR}/DUMP.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/lcd.o.d ${OBJECTDIR}/newmain1.o.d ${OBJECTDIR}/uart.o.d ${OBJECTDIR}/adc.o.d ${OBJECTDIR}/DUMP.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/lcd.o ${OBJECTDIR}/newmain1.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/adc.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/lcd.o.d ${OBJECTDIR}/newmain1.o.d ${OBJECTDIR}/uart.o.d ${OBJECTDIR}/adc.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/lcd.o ${OBJECTDIR}/newmain1.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/adc.o ${OBJECTDIR}/DUMP.o
+OBJECTFILES=${OBJECTDIR}/lcd.o ${OBJECTDIR}/newmain1.o ${OBJECTDIR}/uart.o ${OBJECTDIR}/adc.o
 
 # Source Files
-SOURCEFILES=lcd.c newmain1.c uart.c adc.c DUMP.c
+SOURCEFILES=lcd.c newmain1.c uart.c adc.c
 
 # Pack Options 
 PACK_COMPILER_OPTIONS=-I "${DFP_DIR}/include"
@@ -128,12 +128,6 @@ ${OBJECTDIR}/adc.o: adc.c  .generated_files/flags/default/37cfe316dca8f62bb4504a
 	@${RM} ${OBJECTDIR}/adc.o 
 	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega32 ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS} -g -DDEBUG  -gdwarf-2  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc.o.d" -MT "${OBJECTDIR}/adc.o.d" -MT ${OBJECTDIR}/adc.o  -o ${OBJECTDIR}/adc.o adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
 	
-${OBJECTDIR}/DUMP.o: DUMP.c  .generated_files/flags/default/8f644050bd3482b7f3d2a2cc20d75ac7c1477d0e .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/DUMP.o.d 
-	@${RM} ${OBJECTDIR}/DUMP.o 
-	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega32 ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS} -g -DDEBUG  -gdwarf-2  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/DUMP.o.d" -MT "${OBJECTDIR}/DUMP.o.d" -MT ${OBJECTDIR}/DUMP.o  -o ${OBJECTDIR}/DUMP.o DUMP.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
-	
 else
 ${OBJECTDIR}/lcd.o: lcd.c  .generated_files/flags/default/afd0bfc8bb124b2c8307ea41902555e54dd2f9d4 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}" 
@@ -158,12 +152,6 @@ ${OBJECTDIR}/adc.o: adc.c  .generated_files/flags/default/3131130482969cb7fe3224
 	@${RM} ${OBJECTDIR}/adc.o.d 
 	@${RM} ${OBJECTDIR}/adc.o 
 	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega32 ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS}  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc.o.d" -MT "${OBJECTDIR}/adc.o.d" -MT ${OBJECTDIR}/adc.o  -o ${OBJECTDIR}/adc.o adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
-	
-${OBJECTDIR}/DUMP.o: DUMP.c  .generated_files/flags/default/65f0ed71418a88f8fb91717aadae1acc5878bf3 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/DUMP.o.d 
-	@${RM} ${OBJECTDIR}/DUMP.o 
-	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega32 ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS}  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/DUMP.o.d" -MT "${OBJECTDIR}/DUMP.o.d" -MT ${OBJECTDIR}/DUMP.o  -o ${OBJECTDIR}/DUMP.o DUMP.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
 	
 endif
 

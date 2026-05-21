@@ -45,22 +45,21 @@ int main(void) {
     timer1_init_8khz();
     sei();
 
-//    uint8_t test_buffer[128];
-    uint8_t test_buffer[2048];
-
+    uint8_t test_buffer[128];
+    float last_centered = 0.0f;
+    float last_sample = 0.0f;
     
     while (1) {
         
         // 1. Capture exactly 128 raw hardware samples
-        for (uint8_t i = 0; i < 2048; i++) {
+        for (uint8_t i = 0; i < 128; i++) {
             while (!sample_ready);
             sample_ready = 0;
             test_buffer[i] = current_raw_sample;
         }
 
         // 2. Compute ZCR exactly how your pipeline does it
-        float last_centered = 0.0f;
-        float last_sample = 0.0f;
+        
         uint8_t zero_crossings = 0;
 
         for (uint8_t i = 0; i < 128; i++) {
@@ -82,10 +81,10 @@ int main(void) {
         printf("AVR_ZCR: %.4f\n", avr_zcr);
         printf("AVR_CROSSINGS: %d\n", zero_crossings);
         printf("RAW_DATA:\n");
-        for (uint8_t i = 0; i < 2048; i++) {
-            printf("%d\n", test_buffer[i]);
+        for (uint8_t i = 0; i < 128; i++) {
+            UART_put_uint8_t(test_buffer[i]);
         }
-        printf("--- END FRAME ---\n");
+        printf("\n--- END FRAME ---\n");
 
         _delay_ms(2000); // Debounce / cooldown
     }
